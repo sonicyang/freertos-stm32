@@ -109,6 +109,7 @@ void command_prompt(void *pvParameters)
 
 }
 
+/*
 void system_logger(void *pvParameters)
 {
     char buf[128];
@@ -147,6 +148,7 @@ void system_logger(void *pvParameters)
     
     host_action(SYS_CLOSE, handle);
 }
+*/
 
 int main()
 {

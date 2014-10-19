@@ -26,7 +26,7 @@ INCDIR = include \
 SRCDIR = src \
       	 $(FREERTOS_SRC) \
     	 CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src \
-    	 Utilities/STM32F429I-Discovery
+#    	 Utilities/STM32F429I-Discovery
 
 INCLUDES = $(addprefix -I,$(INCDIR))
 
@@ -89,7 +89,7 @@ $(OUTDIR)/$(TARGET).lst: $(OUTDIR)/$(TARGET).elf
 $(OUTDIR)/$(TARGET).elf: $(OBJ) $(DAT)
 	@echo "    LD      "$@
 	@echo "    MAP     "$(OUTDIR)/$(TARGET).map
-	$(CROSS_COMPILE)gcc $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(OUTDIR)/$(TARGET).map -o $@ $^
+	@$(CROSS_COMPILE)gcc $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(OUTDIR)/$(TARGET).map -o $@ $^
 
 $(OUTDIR)/%.o: %.c
 	@mkdir -p $(dir $@)

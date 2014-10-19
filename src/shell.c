@@ -143,11 +143,13 @@ int filedump(const char* filename){
 
 
 void ps_command(int n, char *argv[]){
+    /*
 	char buf[1024];
 	vTaskList(buf);
     fio_printf(1, "\n\rName          State   Priority  Stack  Num\n\r");
     fio_printf(1, "*******************************************\n\r");
 	fio_printf(1, "%s\r\n", buf + 2);	
+    */
 }
 
 

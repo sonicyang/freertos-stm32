@@ -71,7 +71,7 @@ void enable_rs232_interrupts(void)
 {
     NVIC_InitTypeDef NVIC_InitStructure;
 
-    /* Enable transmit and receive interrupts for the USART2. */
+    /* Enable transmit and receive interrupts for the USART1. */
     USART_ITConfig(USART1, USART_IT_TXE, DISABLE);
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
 
