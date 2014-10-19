@@ -7,7 +7,7 @@ build/Utilities/STM32F429I-Discovery/stm32f429i_discovery_l3gd20.o: \
  CORTEX_M4F_STM32F4/Libraries/CMSIS/Include/core_cmFunc.h \
  CORTEX_M4F_STM32F4/Libraries/CMSIS/Include/core_cm4_simd.h \
  CORTEX_M4F_STM32F4/Libraries/CMSIS/Device/ST/STM32F4xx/Include/system_stm32f4xx.h \
- /home/sonicyang/workspace/freertos-stm32/CORTEX_M4F_STM32F4/stm32f4xx_conf.h \
+ CORTEX_M4F_STM32F4/stm32f4xx_conf.h \
  CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_adc.h \
  CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_can.h \
  CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_crc.h \

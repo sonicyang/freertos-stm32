@@ -1,209 +1,195 @@
-/**
-  ******************************************************************************
-  * @file    Template/main.c 
-  * @author  MCD Application Team
-  * @version V1.0.0
-  * @date    20-September-2013
-  * @brief   Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; COPYRIGHT 2013 STMicroelectronics</center></h2>
-  *
-  * Licensed under MCD-ST Liberty SW License Agreement V2, (the "License");
-  * You may not use this file except in compliance with the License.
-  * You may obtain a copy of the License at:
-  *
-  *        http://www.st.com/software_license_agreement_liberty_v2
-  *
-  * Unless required by applicable law or agreed to in writing, software 
-  * distributed under the License is distributed on an "AS IS" BASIS, 
-  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  * See the License for the specific language governing permissions and
-  * limitations under the License.
-  *
-  ******************************************************************************
-  */
-
-/* Includes ------------------------------------------------------------------*/
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "main.h"
-#include "draw_graph.h"
-#include "move_car.h"
-
+#include "stm32f4xx.h"
+#include "stm32_f429.h"
+/* Scheduler includes. */
 #include "FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
 #include "semphr.h"
+#include <string.h>
 
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
-xQueueHandle t_queue; /* Traffic light queue. */
-xQueueHandle t_mutex; /* Traffic light mutex. */
+/* Filesystem includes */
+#include "filesystem.h"
+#include "fio.h"
+//#include "romfs.h"
+#include "ramfs.h"
+#include "devfs.h"
 
-static int traffic_index = 0; 
-static int button_change_traffic = 0;
-static int states[] = {TRAFFIC_RED, TRAFFIC_YELLOW, TRAFFIC_GREEN, 
-							TRAFFIC_YELLOW};
+#include "clib.h"
+#include "shell.h"
+#include "host.h"
 
-void
-prvInit()
+/* _sromfs symbol can be found in main.ld linker script
+ * it contains file system structure of test_romfs directory
+ */
+extern const unsigned char _sromfs;
+
+//static void setup_hardware();
+
+volatile xSemaphoreHandle serial_tx_wait_sem = NULL;
+/* Add for serial input */
+volatile xQueueHandle serial_rx_queue = NULL;
+
+/* IRQ handler to handle USART2 interruptss (both transmit and receive
+ * interrupts). */
+void USART1_IRQHandler()
 {
-	//LCD init
-	LCD_Init();
-	IOE_Config();
-	LTDC_Cmd( ENABLE );
+	static signed portBASE_TYPE xHigherPriorityTaskWoken;
 
-	LCD_LayerInit();
-	LCD_SetLayer( LCD_FOREGROUND_LAYER );
-	LCD_Clear( LCD_COLOR_BLACK );
-	LCD_SetTextColor( LCD_COLOR_WHITE );
-
-	//Button
-	STM_EVAL_PBInit( BUTTON_USER, BUTTON_MODE_GPIO );
-}
-
-static void GetTrafficState(int change_state, int *v_state, int *h_state)
-{
-
-	switch (change_state) {
-	case TRAFFIC_RED:
-		*v_state = TRAFFIC_RED;
-		*h_state = TRAFFIC_GREEN;
-		break;
-	case TRAFFIC_YELLOW:
-		if (*v_state == TRAFFIC_GREEN)
-			*v_state = TRAFFIC_YELLOW;
-		else
-			*h_state = TRAFFIC_YELLOW;
-		break;
-	case TRAFFIC_GREEN:
-		*v_state = TRAFFIC_GREEN;
-		*h_state = TRAFFIC_RED;
-		break;
-	default:
-		ReportError("out of range");
-		break;
-	}
-}
-
-static void DrawGraphTask( void *pvParameters)
-{
-	const portTickType ticks = 100 / portTICK_RATE_MS;
-	int value;
-	int traffic_v_state = TRAFFIC_GREEN;
-	int traffic_h_state = TRAFFIC_RED;
-
-	portBASE_TYPE status;
-
-	DrawBackground();
-
-	while ( 1 ) {
-		/*
-		 * Check if the traffic changed event is sent to
-		 * the queue. If so, we need to change the traffic
-		 * light.
+	/* If this interrupt is for a transmit... */
+	if (USART_GetITStatus(USART1, USART_IT_TXE) != RESET) {
+		/* "give" the serial_tx_wait_sem semaphore to notfiy processes
+		 * that the buffer has a spot free for the next byte.
 		 */
-		status = xQueueReceive(t_queue, &value, ticks);
+		xSemaphoreGiveFromISR(serial_tx_wait_sem, &xHigherPriorityTaskWoken);
 
-		if (status == pdPASS) {
-			GetTrafficState(value, &traffic_v_state, 
-						&traffic_h_state);
-		}
+		/* Diables the transmit interrupt. */
+		USART_ITConfig(USART1, USART_IT_TXE, DISABLE);
+		/* If this interrupt is for a receive... */
+	}else if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET){
+		char msg = USART_ReceiveData(USART1);
 
-		MoveCar(traffic_v_state, traffic_h_state);
+		/* If there is an error when queueing the received byte, freeze! */
+		if(!xQueueSendToBackFromISR(serial_rx_queue, &msg, &xHigherPriorityTaskWoken))
+			while(1);
+	}
+	else {
+		/* Only transmit and receive interrupts should be enabled.
+		 * If this is another type of interrupt, freeze.
+		 */
+		while(1);
+	}
+
+	if (xHigherPriorityTaskWoken) {
+		taskYIELD();
 	}
 }
 
-static void ChgTrafficLightTask(void *pvParameters)
+void send_byte(char ch)
 {
-	int num_ticks;
-	int states_num = sizeof(states) / sizeof(states[0]);
+	/* Wait until the RS232 port can receive another byte (this semaphore
+	 * is "given" by the RS232 port interrupt when the buffer has room for
+	 * another byte.
+	 */
+	while (!xSemaphoreTake(serial_tx_wait_sem, portMAX_DELAY));
 
-	portBASE_TYPE status;
-	portTickType ticks = TRAFFIC_GREEN_TICK;
+	/* Send the byte and enable the transmit interrupt (it is disabled by
+	 * the interrupt).
+	 */
+	USART_SendData(USART1, ch);
+	USART_ITConfig(USART1, USART_IT_TXE, ENABLE);
+}
 
-	while ( 1 ) {
-		ticks = (states[traffic_index] == TRAFFIC_YELLOW ? 
-			TRAFFIC_YELLOW_TICK : TRAFFIC_GREEN_TICK);
+char recv_byte()
+{
+	USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+	char msg;
+	while(!xQueueReceive(serial_rx_queue, &msg, portMAX_DELAY));
+	return msg;
+}
+void command_prompt(void *pvParameters)
+{
+	char buf[128];
+	char *argv[20];
+    char hint[] = USER_NAME "@" USER_NAME "-STM32:~$ ";
 
-		num_ticks = ticks / TRAFFIC_TICK_SLICE;
-
-		status = xQueueSendToBack(t_queue, &states[traffic_index++], 0);
+	fio_printf(1, "\rWelcome to FreeRTOS Shell\r\n");
+	while(1){
+                fio_printf(1, "%s", hint);
+		fio_read(0, buf, 127);
 	
-		if (status != pdPASS)
-			ReportError("Cannot send to the queue!");
+		int n=parse_command(buf, argv);
 
-		if (traffic_index >= states_num)
-			traffic_index = 0;
-
-		while (num_ticks--) { 
-			xSemaphoreTake(t_mutex, portMAX_DELAY);
-			
-			if (button_change_traffic) {
-				button_change_traffic = 0;
-				xSemaphoreGive(t_mutex);
-				break;
-			}
-
-			xSemaphoreGive(t_mutex);
-
-			vTaskDelay(TRAFFIC_TICK_SLICE);
-		}
+		/* will return pointer to the command function */
+		cmdfunc *fptr=do_command(argv[0]);
+		if(fptr!=NULL)
+			fptr(n, argv);
+		else
+			fio_printf(2, "\r\n\"%s\" command not found.\r\n", argv[0]);
 	}
+
 }
 
-static void ButtonEventTask(void *pvParameters)
+void system_logger(void *pvParameters)
 {
-	while (1) {
-		if( STM_EVAL_PBGetState( BUTTON_USER ) ){
+    char buf[128];
+    char output[512] = {0};
+    char *tag = "\nName          State   Priority  Stack  Num\n*******************************************\n";
+    int handle, error;
+    const portTickType xDelay = 100000 / 100;
 
-			while( STM_EVAL_PBGetState( BUTTON_USER ) );
+    handle = host_action(SYS_OPEN, "output/syslog", 4);
+    if(handle == -1) {
+        fio_printf(1, "Open file error!\n");
+        return;
+    }
 
-			xSemaphoreTake(t_mutex, portMAX_DELAY);
-			button_change_traffic = 1;
-			xSemaphoreGive(t_mutex);
-		}
-	}
+    while(1) {
+        memcpy(output, tag, strlen(tag));
+        error = host_action(SYS_WRITE, handle, (void *)output, strlen(output));
+        if(error != 0) {
+            fio_printf(1, "Write file error! Remain %d bytes didn't write in the file.\n\r", error);
+            host_action(SYS_CLOSE, handle);
+            return;
+        }
+        vTaskList(buf);
+
+        memcpy(output, (char *)(buf + 2), strlen((char *)buf) - 2);
+
+        error = host_action(SYS_WRITE, handle, (void *)buf, strlen((char *)buf));
+        if(error != 0) {
+            fio_printf(1, "Write file error! Remain %d bytes didn't write in the file.\n\r", error);
+            host_action(SYS_CLOSE, handle);
+            return;
+        }
+
+        vTaskDelay(xDelay);
+    }
+    
+    host_action(SYS_CLOSE, handle);
 }
 
-//Main Function
-int main(void)
+int main()
 {
+	init_rs232();
+	enable_rs232_interrupts();
+	enable_rs232();
+	
+	fs_init();
+	fio_init();
+    
+    //register_fs(&ramfs_r);
+    register_devfs();
+    register_ramfs();
+    fs_mount(NULL, RAMFS_TYPE, NULL);
 
-	t_queue = xQueueCreate(1, sizeof(int));
-	if (!t_queue) {
-		ReportError("Failed to create t_queue");
-		while(1);
-	}
+//	register_romfs("romfs", &_sromfs);
+//	register_ramfs("ramfs");
+	
+	/* Create the queue used by the serial task.  Messages for write to
+	 * the RS232. */
+	vSemaphoreCreateBinary(serial_tx_wait_sem);
+	/* Add for serial input 
+	 * Reference: www.freertos.org/a00116.html */
+	serial_rx_queue = xQueueCreate(1, sizeof(char));
 
-	t_mutex = xSemaphoreCreateMutex();
-	if (!t_mutex) {
-		ReportError("Failed to create t_mutex");
-		while(1);
-	}
+	/* Create a task to output text read from romfs. */
+	xTaskCreate(command_prompt,
+	            "CLI",
+	            512 /* stack size */, NULL, tskIDLE_PRIORITY + 2, NULL);
 
-	prvInit();
+#if 0
+	/* Create a task to record system log. */
+	xTaskCreate(system_logger,
+	            (signed portCHAR *) "Logger",
+	            1024 /* stack size */, NULL, tskIDLE_PRIORITY + 1, NULL);
+#endif
 
-	xTaskCreate(ChgTrafficLightTask, "Traffic Light Task", 256, 
-			( void * ) NULL, tskIDLE_PRIORITY + 1, NULL);
-
-	xTaskCreate(ButtonEventTask, (char *) "Button Event Task", 256,
-		   	NULL, tskIDLE_PRIORITY + 1, NULL);
-
-	xTaskCreate(DrawGraphTask, (char *) "Draw Graph Task", 256,
-		   	NULL, tskIDLE_PRIORITY + 2, NULL);
-
-
-	RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_RNG, ENABLE);
-        RNG_Cmd(ENABLE);
-
-	//Call Scheduler
+	/* Start running the tasks. */
 	vTaskStartScheduler();
+
+	return 0;
 }
 
+void vApplicationTickHook()
+{
+}

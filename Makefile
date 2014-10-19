@@ -14,7 +14,7 @@ FREERTOS_INC = $(FREERTOS_SRC)/include/
 
 OUTDIR = build
 INCDIR = include \
-		 $(PWD)/CORTEX_M4F_STM32F4 \
+		 CORTEX_M4F_STM32F4 \
          $(FREERTOS_INC) \
 		 $(FREERTOS_SRC)/portable/GCC/ARM_CM4F \
     	 CORTEX_M4F_STM32F4/board \
@@ -56,6 +56,7 @@ LDFLAGS += -L $(call get_library_path,libgcc.a)
 # Basic configurations
 CFLAGS += -g3 -std=c99
 CFLAGS += -Wall -Werror
+CFLAGS += -DUSER_NAME=\"$(USER)\"
 
 # Optimizations
 CFLAGS += -g -std=c99 -O0 -ffast-math
@@ -88,7 +89,7 @@ $(OUTDIR)/$(TARGET).lst: $(OUTDIR)/$(TARGET).elf
 $(OUTDIR)/$(TARGET).elf: $(OBJ) $(DAT)
 	@echo "    LD      "$@
 	@echo "    MAP     "$(OUTDIR)/$(TARGET).map
-	@$(CROSS_COMPILE)gcc $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(OUTDIR)/$(TARGET).map -o $@ $^
+	$(CROSS_COMPILE)gcc $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(OUTDIR)/$(TARGET).map -o $@ $^
 
 $(OUTDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
