@@ -1,4 +1,4 @@
-PROJECT = traffic
+PROJECT = VFS
 
 EXECUTABLE = $(PROJECT).elf
 BIN_IMAGE = $(PROJECT).bin
@@ -20,7 +20,7 @@ CPU = cortex-m4
 CFLAGS = -mcpu=$(CPU) -march=armv7e-m -mtune=cortex-m4
 CFLAGS += -mlittle-endian -mthumb
 # Need study
-CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -O0
+CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=softfp
 
 define get_library_path
     $(shell dirname $(shell $(CC) $(CFLAGS) -print-file-name=$(1)))
@@ -29,11 +29,11 @@ LDFLAGS += -L $(call get_library_path,libc.a)
 LDFLAGS += -L $(call get_library_path,libgcc.a)
 
 # Basic configurations
-CFLAGS += -g -std=c99
-CFLAGS += -Wall
+CFLAGS += -g3 -std=c99
+CFLAGS += -Wall -Werror
 
 # Optimizations
-CFLAGS += -g -std=c99 -O3 -ffast-math
+CFLAGS += -g -std=c99 -O0 -ffast-math
 CFLAGS += -ffunction-sections -fdata-sections
 CFLAGS += -Wl,--gc-sections
 CFLAGS += -fno-common
@@ -59,15 +59,18 @@ OBJS += \
       $(PWD)/CORTEX_M4F_STM32F4/startup/system_stm32f4xx.o \
       #$(PWD)/CORTEX_M4F_STM32F4/stm32f4xx_it.o \
 
+#FreeRTOS
+FREERTOS_SRC = $(PWD)/freertos
+FREERTOS_INC = $(FREERTOS_SRC)/include/    
 OBJS += \
-      $(PWD)/croutine.o \
-      $(PWD)/event_groups.o \
-      $(PWD)/list.o \
-      $(PWD)/queue.o \
-      $(PWD)/tasks.o \
-      $(PWD)/timers.o \
-      $(PWD)/portable/GCC/ARM_CM4F/port.o \
-      $(PWD)/portable/MemMang/heap_1.o \
+      $(FREERTOS_SRC)/croutine.o \
+      $(FREERTOS_SRC)/event_groups.o \
+      $(FREERTOS_SRC)/list.o \
+      $(FREERTOS_SRC)/queue.o \
+      $(FREERTOS_SRC)/tasks.o \
+      $(FREERTOS_SRC)/timers.o \
+      $(FREERTOS_SRC)/portable/GCC/ARM_CM4F/port.o \
+      $(FREERTOS_SRC)/portable/MemMang/heap_1.o \
 
 OBJS += \
     $(PWD)/CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src/misc.o \
@@ -95,8 +98,8 @@ CFLAGS += -I $(PWD)/CORTEX_M4F_STM32F4/traffic/include
 
 CFLAGS += -DUSE_STDPERIPH_DRIVER
 CFLAGS += -I $(PWD)/CORTEX_M4F_STM32F4 \
-	  -I $(PWD)/include \
-	  -I $(PWD)/portable/GCC/ARM_CM4F \
+	  -I $(FREERTOS_INC) \
+	  -I $(FREERTOS_SRC)/portable/GCC/ARM_CM4F \
 	  -I $(PWD)/CORTEX_M4F_STM32F4/board \
 	  -I $(PWD)/CORTEX_M4F_STM32F4/Libraries/CMSIS/Device/ST/STM32F4xx/Include \
 	  -I $(PWD)/CORTEX_M4F_STM32F4/Libraries/CMSIS/Include \
@@ -127,8 +130,7 @@ flash:
 
 openocd_flash:
 	openocd \
-	-f interface/stlink-v2.cfg \
-	-f target/stm32f4x_stlink.cfg \
+	-f board/stm32f429discovery.cfg \
 	-c "init" \
 	-c "reset init" \
 	-c "flash probe 0" \
