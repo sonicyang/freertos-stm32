@@ -1,5 +1,8 @@
 TARGET = VFS
 
+#set the path to STM32F429I-Discovery firmware package
+STDP ?= ../STM32F429I-Discovery_FW_V1.0.1
+
 EXECUTABLE = $(TARGET).elf
 BIN_IMAGE = $(TARGET).bin
 HEX_IMAGE = $(TARGET).hex
@@ -18,21 +21,21 @@ SIZE = $(CROSS_COMPILE)size
 FREERTOS_SRC = freertos
 FREERTOS_INC = $(FREERTOS_SRC)/include/    
 
-OUTDIR = build
+BUILDDIR = build
+OUTDIR = build/$(TARGET)
 INCDIR = include \
 		 CORTEX_M4F_STM32F4 \
          $(FREERTOS_INC) \
 		 $(FREERTOS_SRC)/portable/GCC/ARM_CM4F \
-    	 CORTEX_M4F_STM32F4/board \
-	  	 CORTEX_M4F_STM32F4/Libraries/CMSIS/Device/ST/STM32F4xx/Include \
-	  	 CORTEX_M4F_STM32F4/Libraries/CMSIS/Include \
-	  	 CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/inc \
-	  	 Utilities/STM32F429I-Discovery
+	  	 $(STDP)/Libraries/CMSIS/Device/ST/STM32F4xx/Include \
+	  	 $(STDP)/Libraries/CMSIS/Include \
+	  	 $(STDP)/Libraries/STM32F4xx_StdPeriph_Driver/inc \
+	  	 $(STDP)/Utilities/STM32F429I-Discovery
 
 SRCDIR = src \
       	 $(FREERTOS_SRC) \
-    	 CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src \
-#    	 Utilities/STM32F429I-Discovery
+    	 $(STDP)/Libraries/STM32F4xx_StdPeriph_Driver/src \
+#    	 $(STDP)/Utilities/STM32F429I-Discovery
 
 INCLUDES = $(addprefix -I,$(INCDIR))
 
@@ -109,7 +112,7 @@ $(OUTDIR)/%.o: %.s
 
 .PHONY: clean
 clean:
-	rm -rf $(OUTDIR) $(TMPDIR)
+	rm -rf $(BUILDDIR) $(TMPDIR)
 
 -include $(DEP)
 
