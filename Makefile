@@ -141,3 +141,9 @@ dbg: $(OUTDIR)/$(BIN_IMAGE)
     cat $(OUTDIR)/openocd_pid |`xargs kill 2>/dev/null || test true` && \
     rm -f $(OUTDIR)/openocd_pid
 
+cdbg: $(OUTDIR)/$(BIN_IMAGE) 
+	openocd -f board/stm32f429discovery.cfg >/dev/null & \
+    echo $$! > $(OUTDIR)/openocd_pid && \
+    cgdb -d $(CROSS_COMPILE)gdb -x $(TOOLDIR)/gdbscript && \
+    cat $(OUTDIR)/openocd_pid |`xargs kill 2>/dev/null || test true` && \
+    rm -f $(OUTDIR)/openocd_pid
