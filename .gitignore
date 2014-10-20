@@ -1,7 +1,7 @@
 # Object files
 *.o
 *.ko
-*.o.d
+*d
 
 # Libraries
 *.lib
@@ -23,3 +23,5 @@
 *.elf
 *.lst
 *.hex
+
+build
