@@ -1,4 +1,4 @@
-TARGET = VFS
+TARGET = main
 
 #set the path to STM32F429I-Discovery firmware package
 STDP ?= ../STM32F429I-Discovery_FW_V1.0.1
@@ -21,6 +21,7 @@ SIZE = $(CROSS_COMPILE)size
 FREERTOS_SRC = freertos
 FREERTOS_INC = $(FREERTOS_SRC)/include/    
 
+TOOLDIR = tool
 BUILDDIR = build
 OUTDIR = build/$(TARGET)
 INCDIR = include \
@@ -132,4 +133,11 @@ openocd_flash:
 	-c "flash info 0" \
 	-c "flash write_image erase $(OUTDIR)/$(TARGET).bin 0x08000000" \
 	-c "reset run" -c shutdown
+
+dbg: $(OUTDIR)/$(BIN_IMAGE) 
+	openocd -f board/stm32f429discovery.cfg >/dev/null & \
+    echo $$! > $(OUTDIR)/openocd_pid && \
+    $(CROSS_COMPILE)gdb -x $(TOOLDIR)/gdbscript && \
+    cat $(OUTDIR)/openocd_pid |`xargs kill 2>/dev/null || test true` && \
+    rm -f $(OUTDIR)/openocd_pid
 
