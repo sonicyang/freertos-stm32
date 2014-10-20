@@ -1,5 +1,11 @@
 TARGET = VFS
 
+EXECUTABLE = $(TARGET).elf
+BIN_IMAGE = $(TARGET).bin
+HEX_IMAGE = $(TARGET).hex
+MAP_FILE = $(TARGET).map
+LIST_FILE = $(TARGET).lst
+
 # Toolchain configurations
 CROSS_COMPILE ?= arm-none-eabi-
 CC = $(CROSS_COMPILE)gcc
@@ -76,20 +82,20 @@ LDFLAGS += -TCORTEX_M4F_STM32F4/stm32f429zi_flash.ld
 CFLAGS += -DUSE_STDPERIPH_DRIVER
 CFLAGS += -D"assert_param(expr)=((void)0)"
 
-all: $(OUTDIR)/$(TARGET).bin $(OUTDIR)/$(TARGET).lst
+all: $(OUTDIR)/$(BIN_IMAGE) $(OUTDIR)/$(LIST_FILE)
 
-$(OUTDIR)/$(TARGET).bin: $(OUTDIR)/$(TARGET).elf
+$(OUTDIR)/$(BIN_IMAGE): $(OUTDIR)/$(EXECUTABLE)
 	@echo "    OBJCOPY "$@
 	@$(CROSS_COMPILE)objcopy -Obinary $< $@
 
-$(OUTDIR)/$(TARGET).lst: $(OUTDIR)/$(TARGET).elf
+$(OUTDIR)/$(LIST_FILE): $(OUTDIR)/$(EXECUTABLE)
 	@echo "    LIST    "$@
 	@$(CROSS_COMPILE)objdump -S $< > $@
 
-$(OUTDIR)/$(TARGET).elf: $(OBJ) $(DAT)
+$(OUTDIR)/$(EXECUTABLE): $(OBJ) $(DAT)
 	@echo "    LD      "$@
-	@echo "    MAP     "$(OUTDIR)/$(TARGET).map
-	@$(CROSS_COMPILE)gcc $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(OUTDIR)/$(TARGET).map -o $@ $^
+	@echo "    MAP     "$(OUTDIR)/$(MAP_FILE)
+	@$(CROSS_COMPILE)gcc $(CFLAGS) $(LDFLAGS) -Wl,-Map=$(OUTDIR)/$(MAP_FILE) -o $@ $^
 
 $(OUTDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
