@@ -40,7 +40,7 @@ SRCDIR = src \
 
 INCLUDES = $(addprefix -I,$(INCDIR))
 
-HEAP_IMPL = heap_1
+HEAP_IMPL = heap_2
 SRC = $(wildcard $(addsuffix /*.c,$(SRCDIR))) \
 	  $(wildcard $(addsuffix /*.s,$(SRCDIR))) \
 	  $(FREERTOS_SRC)/portable/MemMang/$(HEAP_IMPL).c \
